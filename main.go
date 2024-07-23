@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	baseURL        = "http://81.140.168.36:8080"
+	baseURL        = "http://81.140.168.36:443"
 	configDir      = ".config/gopi"
 	configFileName = "config.json"
 )
@@ -239,7 +239,7 @@ func upload(filePath, user, pass string) {
 	writer.Close()
 
 	// Create the request
-	req, err := http.NewRequest("POST", "http://81.140.168.36:8080/upload", body)
+	req, err := http.NewRequest("POST", "http://81.140.168.36:443/upload", body)
 	if err != nil {
 		fmt.Printf("Failed to create request: %v\n", err)
 		return
