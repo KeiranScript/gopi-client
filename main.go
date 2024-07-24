@@ -39,7 +39,10 @@ func main() {
 	}
 
 	// Load configuration
-	loadConfig()
+	if err := loadConfig(); err != nil {
+		fmt.Printf("Error loading config: %v\n", err)
+		return
+	}
 
 	// Check if credentials are provided and validate
 	if username != "" && password != "" {
@@ -47,8 +50,9 @@ func main() {
 			fmt.Println("Authentication failed. Please check your username and password.")
 			return
 		}
-		saveConfig(username, password)
-		if verbose {
+		if err := saveConfig(username, password); err != nil {
+			fmt.Printf("Error saving config: %v\n", err)
+		} else if verbose {
 			fmt.Println("Authentication successful and credentials saved.")
 		}
 	} else {
@@ -58,9 +62,6 @@ func main() {
 			return
 		}
 	}
-
-	// Ensure config is loaded after possible saving
-	loadConfig()
 
 	// Determine action
 	args := flag.Args()
@@ -208,7 +209,9 @@ func register(user, pass string) {
 	body, _ := io.ReadAll(resp.Body)
 	fmt.Printf("Response: %s\n", body)
 
-	saveConfig(user, pass)
+	if err := saveConfig(user, pass); err != nil {
+		fmt.Printf("Error saving config: %v\n", err)
+	}
 }
 
 func upload(filePath, user, pass string) {
@@ -314,23 +317,26 @@ func deleteFile(index string) {
 }
 
 // loadConfig reads and applies configuration from file
-func loadConfig() {
+func loadConfig() error {
 	homeDir, _ := os.UserHomeDir()
 	configPath := filepath.Join(homeDir, configDir, configFileName)
 
+	if _, err := os.Stat(configPath); os.IsNotExist(err) {
+		// File does not exist; create the directory if necessary
+		if err := os.MkdirAll(filepath.Dir(configPath), 0755); err != nil {
+			return fmt.Errorf("failed to create config directory: %w", err)
+		}
+		return nil
+	}
+
 	file, err := os.ReadFile(configPath)
 	if err != nil {
-		if os.IsNotExist(err) {
-			return
-		}
-		fmt.Printf("Failed to read config file: %v\n", err)
-		return
+		return fmt.Errorf("failed to read config file: %w", err)
 	}
 
 	var config map[string]string
 	if err := json.Unmarshal(file, &config); err != nil {
-		fmt.Printf("Failed to decode config file: %v\n", err)
-		return
+		return fmt.Errorf("failed to decode config file: %w", err)
 	}
 
 	username = config["username"]
@@ -339,12 +345,19 @@ func loadConfig() {
 	if verbose {
 		fmt.Printf("Loaded credentials - Username: %s, Password: %s\n", username, password)
 	}
+
+	return nil
 }
 
 // saveConfig writes configuration to file
-func saveConfig(user, pass string) {
+func saveConfig(user, pass string) error {
 	homeDir, _ := os.UserHomeDir()
 	configPath := filepath.Join(homeDir, configDir, configFileName)
+
+	// Create the directory if it doesn't exist
+	if err := os.MkdirAll(filepath.Dir(configPath), 0755); err != nil {
+		return fmt.Errorf("failed to create config directory: %w", err)
+	}
 
 	config := map[string]string{
 		"username": user,
@@ -353,12 +366,13 @@ func saveConfig(user, pass string) {
 
 	data, err := json.Marshal(config)
 	if err != nil {
-		fmt.Printf("Failed to marshal config data: %v\n", err)
-		return
+		return fmt.Errorf("failed to marshal config data: %w", err)
 	}
 
-	err = os.WriteFile(configPath, data, 0644)
-	if err != nil {
-		fmt.Printf("Failed to write config file: %v\n", err)
+	if err := os.WriteFile(configPath, data, 0644); err != nil {
+		return fmt.Errorf("failed to write config file: %w", err)
 	}
+
+	return nil
 }
+
